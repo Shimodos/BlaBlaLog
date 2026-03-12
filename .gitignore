@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Models (large files)
+models/
+
+# IDE & tools
+.vscode/
+.idea/
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Database
+*.db
+
+# Release builds
+release/
+
+# Node
+node_modules/
+
+# Environment
+.env
+.env.local

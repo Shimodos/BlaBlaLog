@@ -1,0 +1,29 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Runtime data
+data/*.db
+data/*.wav
+data/*.mp3
+
+# Models (downloaded at runtime)
+models/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

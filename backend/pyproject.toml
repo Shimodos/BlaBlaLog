@@ -1,0 +1,28 @@
+[project]
+name = "voicescribe"
+version = "0.1.0"
+description = "Local meeting transcription with speaker identification for Windows"
+requires-python = ">=3.11"
+dependencies = [
+    "faster-whisper>=1.1.0",
+    "PyAudioWPatch>=0.2.13",
+    "silero-vad>=5.1",
+    "numpy>=1.26",
+    "aiosqlite>=0.20",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "sounddevice>=0.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+voicescribe = "src.main:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
