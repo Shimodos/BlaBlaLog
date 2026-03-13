@@ -14,37 +14,69 @@ jobs:
           - os: windows-latest
             platform: win
             requirements: requirements-win.txt
-            python_venv: .venv\Scripts\python.exe
           - os: macos-latest
             platform: mac
             requirements: requirements-mac.txt
-            python_venv: .venv/bin/python
           - os: ubuntu-latest
             platform: linux
             requirements: requirements-linux.txt
-            python_venv: .venv/bin/python
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # ---- Python backend (install into venv) ----
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Create backend venv and install deps
+      # ---- Build portable Python backend ----
+      - name: Create portable backend (Windows)
+        if: runner.os == 'Windows'
         working-directory: backend
+        shell: pwsh
         run: |
-          python -m venv .venv
-          ${{ matrix.python_venv }} -m pip install --upgrade pip
-          ${{ matrix.python_venv }} -m pip install -r ${{ matrix.requirements }}
+          # Download Python embeddable package (fully portable, no registry)
+          $pyVersion = "3.11.9"
+          $zipUrl = "https://www.python.org/ftp/python/$pyVersion/python-$pyVersion-embed-amd64.zip"
+          Invoke-WebRequest -Uri $zipUrl -OutFile python-embed.zip
+          New-Item -ItemType Directory -Force -Path .venv/Scripts
+          Expand-Archive python-embed.zip -DestinationPath .venv/Scripts -Force
+          Remove-Item python-embed.zip
 
-      - name: Verify backend starts
+          # Enable site-packages by uncommenting 'import site' in ._pth file
+          $pthFile = Get-ChildItem .venv/Scripts/python*._pth | Select-Object -First 1
+          (Get-Content $pthFile) -replace '#import site','import site' | Set-Content $pthFile
+
+          # Install pip into embedded Python
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
+          .venv/Scripts/python.exe get-pip.py --no-warn-script-location
+          Remove-Item get-pip.py
+
+          # Install project dependencies
+          .venv/Scripts/python.exe -m pip install -r requirements-win.txt --no-warn-script-location
+
+          # Verify backend can import
+          .venv/Scripts/python.exe -c "from src.main import main; print('Backend imports OK')"
+
+      - name: Create portable backend (macOS/Linux)
+        if: runner.os != 'Windows'
         working-directory: backend
         run: |
-          ${{ matrix.python_venv }} -c "from src.main import main; print('Backend imports OK')"
+          # Create venv with copies (embeds python binary, not symlinks)
+          python -m venv --copies .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r ${{ matrix.requirements }}
+
+          # Make shebangs portable
+          find .venv/bin -maxdepth 1 -type f | while read f; do
+            if head -1 "$f" | grep -q "^#!.*python"; then
+              sed -i.bak "1s|#!.*|#!/usr/bin/env python3|" "$f" && rm -f "$f.bak"
+            fi
+          done
+
+          # Verify
+          .venv/bin/python -c "from src.main import main; print('Backend imports OK')"
 
       # ---- Node.js frontend ----
       - uses: actions/setup-node@v4
@@ -75,8 +107,6 @@ jobs:
             release/**/*.AppImage
             release/**/*.zip
             release/**/win-unpacked/**
-            release/**/mac-unpacked/**
-            release/**/linux-unpacked/**
           if-no-files-found: warn
 
   release:
