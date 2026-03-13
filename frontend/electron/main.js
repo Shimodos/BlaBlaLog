@@ -88,8 +88,15 @@ function startPythonBackend() {
   log(`[BOOT] exe exists: ${fs.existsSync(exe)}`);
 
   try {
-    // Set PYTHONPATH to backend root so embedded Python can find 'src' module
-    const env = { ...process.env, PYTHONPATH: cwd };
+    // Set PYTHONPATH so embedded Python finds 'src' module + installed packages
+    const isWin = process.platform === "win32";
+    const sep = isWin ? ";" : ":";
+    const sitePackages = isWin
+      ? path.join(cwd, ".venv", "Scripts", "Lib", "site-packages")
+      : path.join(cwd, ".venv", "lib", "python3.11", "site-packages");
+    const pythonPath = [cwd, sitePackages].join(sep);
+    const env = { ...process.env, PYTHONPATH: pythonPath };
+    log(`[BOOT] PYTHONPATH=${pythonPath}`);
     pythonProcess = spawn(exe, args, { cwd, stdio: ["pipe", "pipe", "pipe"], env });
 
     pythonProcess.stdout.setEncoding("utf8");

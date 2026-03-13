@@ -44,9 +44,9 @@ jobs:
           Expand-Archive python-embed.zip -DestinationPath .venv/Scripts -Force
           Remove-Item python-embed.zip
 
-          # Enable site-packages in ._pth file
+          # Enable site-packages in ._pth file (needed for pip install)
           $pthFile = Get-ChildItem .venv/Scripts/python*._pth | Select-Object -First 1
-          (Get-Content $pthFile) -replace '#import site','import site' | Set-Content $pthFile
+          @("python311.zip", ".", "Lib\site-packages", "import site") | Set-Content $pthFile
 
           # Install pip into embedded Python
           Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
@@ -56,8 +56,13 @@ jobs:
           # Install project dependencies
           .venv/Scripts/python.exe -m pip install -r requirements-win.txt --no-warn-script-location
 
-          # Verify backend can import (PYTHONPATH points to backend root)
-          $env:PYTHONPATH = (Get-Location).Path
+          # Remove ._pth file so PYTHONPATH works at runtime
+          # (._pth overrides sys.path completely, blocking PYTHONPATH)
+          Remove-Item $pthFile
+
+          # Verify backend can import
+          $sitePkgs = Join-Path (Get-Location).Path ".venv\Scripts\Lib\site-packages"
+          $env:PYTHONPATH = "$(Get-Location);$sitePkgs"
           .venv/Scripts/python.exe -c "from src.main import main; print('Backend imports OK')"
 
       - name: Create portable backend (macOS/Linux)
