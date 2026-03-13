@@ -61,8 +61,13 @@ function getPythonPath() {
       args: ["serve"],
       cwd: resBackend,
     });
-    // Fallback: venv inside resources/backend/
-    const venvDir = path.join(resBackend, ".venv");
+    // Fallback: venv inside resources/backend/ (try .venv-portable first, then .venv)
+    const venvNames = [".venv-portable", ".venv"];
+    let venvDir = path.join(resBackend, ".venv-portable");
+    for (const name of venvNames) {
+      const candidate = path.join(resBackend, name);
+      if (fs.existsSync(candidate)) { venvDir = candidate; break; }
+    }
     ensureVenvExecutable(venvDir);
     // Try multiple python binary names (macOS venv may have python3 but not python)
     const pythonNames = isWin ? ["python.exe"] : ["python", "python3", "python3.11"];
@@ -76,9 +81,13 @@ function getPythonPath() {
     }
   }
 
-  // Dev / portable: backend is sibling folder
+  // Dev / portable: backend is sibling folder (try .venv-portable first, then .venv)
   const devBackend = path.resolve(__dirname, "..", "..", "backend");
-  const devVenv = path.join(devBackend, ".venv");
+  let devVenv = path.join(devBackend, ".venv");
+  for (const name of [".venv-portable", ".venv"]) {
+    const candidate = path.join(devBackend, name);
+    if (fs.existsSync(candidate)) { devVenv = candidate; break; }
+  }
   const devPythonNames = isWin ? ["python.exe"] : ["python", "python3", "python3.11"];
   const devBinDir = isWin ? path.join(devVenv, "Scripts") : path.join(devVenv, "bin");
   for (const name of devPythonNames) {
@@ -137,8 +146,13 @@ function startPythonBackend() {
     // Set PYTHONPATH so embedded Python finds 'src' module + installed packages
     const isWin = process.platform === "win32";
     const sep = isWin ? ";" : ":";
-    const venvDir = path.join(cwd, ".venv");
-    const sitePackages = findSitePackages(venvDir);
+    // Find the venv dir that actually exists in cwd
+    let runtimeVenv = path.join(cwd, ".venv");
+    for (const name of [".venv-portable", ".venv"]) {
+      const candidate = path.join(cwd, name);
+      if (fs.existsSync(candidate)) { runtimeVenv = candidate; break; }
+    }
+    const sitePackages = findSitePackages(runtimeVenv);
     const pythonPath = [cwd, sitePackages].join(sep);
     const env = { ...process.env, PYTHONPATH: pythonPath };
     log(`[BOOT] PYTHONPATH=${pythonPath}`);
