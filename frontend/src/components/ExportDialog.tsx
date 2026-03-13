@@ -38,8 +38,28 @@ export function ExportDialog({ meetingId, meetingTitle, onClose }: ExportDialogP
   async function handleExport() {
     setLoading(true);
     try {
+      const ext = options.format;
+      const filterMap: Record<string, { name: string; extensions: string[] }> = {
+        md: { name: 'Markdown', extensions: ['md'] },
+        txt: { name: 'Text', extensions: ['txt'] },
+        srt: { name: 'Subtitles', extensions: ['srt'] },
+        json: { name: 'JSON', extensions: ['json'] },
+      };
+
+      const defaultName = `${meetingTitle || 'transcript'}.${ext}`;
+      const filePath = await (window as any).electronAPI?.showSaveDialog?.({
+        defaultName,
+        filters: [filterMap[ext] || { name: 'All Files', extensions: ['*'] }],
+      });
+
+      if (!filePath) {
+        setLoading(false);
+        return; // User cancelled
+      }
+
       await sendCommand('export', {
         meeting_id: meetingId,
+        path: filePath,
         ...options,
       });
       setExported(true);

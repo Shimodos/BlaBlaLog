@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { useBackend } from '@/hooks/useBackend';
 import { LiveTranscript } from './LiveTranscript';
@@ -33,10 +33,12 @@ function VuMeter({ level, label }: { level: number; label: string }) {
 }
 
 function ProcessingProgress({ stage, progress, message }: { stage: string; progress: number; message: string }) {
+  const isActive = stage === 'transcription' || stage === 'diarization' || stage === 'identification';
   return (
     <div className="processing-progress">
       <div className="processing-progress__header">
         <span className="processing-progress__stage">
+          {isActive && <span className="processing-spinner" />}
           {stage === 'transcription' && 'Transcribing...'}
           {stage === 'diarization' && 'Speaker diarization...'}
           {stage === 'identification' && 'Identifying speakers...'}
@@ -47,8 +49,8 @@ function ProcessingProgress({ stage, progress, message }: { stage: string; progr
       </div>
       <div className="processing-progress__track">
         <div
-          className={`processing-progress__fill${stage === 'error' ? ' processing-progress__fill--error' : ''}${stage === 'complete' ? ' processing-progress__fill--complete' : ''}`}
-          style={{ width: `${progress}%` }}
+          className={`processing-progress__fill${stage === 'error' ? ' processing-progress__fill--error' : ''}${stage === 'complete' ? ' processing-progress__fill--complete' : ''}${isActive ? ' processing-progress__fill--pulse' : ''}`}
+          style={{ width: `${Math.max(progress, isActive ? 5 : 0)}%` }}
         />
       </div>
       <div className="processing-progress__message">{message}</div>
@@ -60,11 +62,13 @@ export function RecordingPanel() {
   const {
     isRecording,
     recordingDuration,
+    recordingStartTime,
     liveSegments,
     audioLevels,
     processing,
     setRecording,
     setRecordingDuration,
+    setRecordingStartTime,
     setCurrentMeetingId,
     setAudioLevels,
     setProcessing,
@@ -79,7 +83,17 @@ export function RecordingPanel() {
   const [selectedMic, setSelectedMic] = useState('');
   const [selectedLoopback, setSelectedLoopback] = useState('');
   const [loading, setLoading] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep timer running while recording — uses store so survives tab switches
+  useEffect(() => {
+    if (!isRecording || !recordingStartTime) return;
+
+    const id = setInterval(() => {
+      setRecordingDuration(Math.floor((Date.now() - recordingStartTime) / 1000));
+    }, 500);
+
+    return () => clearInterval(id);
+  }, [isRecording, recordingStartTime, setRecordingDuration]);
 
   // Load devices on mount
   useEffect(() => {
@@ -174,18 +188,6 @@ export function RecordingPanel() {
     return unsub;
   }, [subscribe, setAudioLevels, setProcessing, upsertLiveSegment, clearLiveSegments]);
 
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => stopTimer();
-  }, [stopTimer]);
-
   // Polling fallback: if processing is stuck, poll for transcript
   const processingMeetingIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -254,13 +256,8 @@ export function RecordingPanel() {
         setCurrentMeetingId(res.meeting_id);
       }
 
+      setRecordingStartTime(Date.now());
       setRecording(true);
-
-      // Start timer
-      const startTime = Date.now();
-      timerRef.current = setInterval(() => {
-        setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
     } catch (err: any) {
       setError(err?.message || 'Failed to start recording');
     } finally {
@@ -270,9 +267,8 @@ export function RecordingPanel() {
 
   const handleStopRecording = async () => {
     setLoading(true);
-    // Stop timer IMMEDIATELY
-    stopTimer();
     setRecording(false);
+    setRecordingStartTime(null);
 
     try {
       setProcessing({

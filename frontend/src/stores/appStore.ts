@@ -16,6 +16,7 @@ interface AppState {
   // Recording state
   isRecording: boolean;
   recordingDuration: number;
+  recordingStartTime: number | null; // Date.now() when recording started
   currentMeetingId: string | null;
   liveSegments: TranscriptSegment[];
 
@@ -45,6 +46,7 @@ interface AppState {
   // Actions — recording
   setRecording: (recording: boolean) => void;
   setRecordingDuration: (duration: number) => void;
+  setRecordingStartTime: (time: number | null) => void;
   setCurrentMeetingId: (id: string | null) => void;
   addLiveSegment: (segment: TranscriptSegment) => void;
   updateLiveSegment: (segment: TranscriptSegment) => void;
@@ -70,6 +72,7 @@ export const useAppStore = create<AppState>((set) => ({
   // Recording
   isRecording: false,
   recordingDuration: 0,
+  recordingStartTime: null,
   currentMeetingId: null,
   liveSegments: [],
 
@@ -89,6 +92,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setRecording: (isRecording) => set({ isRecording }),
   setRecordingDuration: (recordingDuration) => set({ recordingDuration }),
+  setRecordingStartTime: (recordingStartTime) => set({ recordingStartTime }),
   setCurrentMeetingId: (currentMeetingId) => set({ currentMeetingId }),
   addLiveSegment: (segment) =>
     set((state) => ({ liveSegments: [...state.liveSegments, segment] })),

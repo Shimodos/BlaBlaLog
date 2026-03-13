@@ -1010,15 +1010,14 @@ class JsonRpcHandler:
 
     async def _handle_export(self, params: dict) -> dict:
         meeting_id = params.get("meeting_id")
-        fmt = params.get("format")
+        fmt = params.get("format", "md")
         path = params.get("path")
+        is_preview = params.get("preview", False)
+        include_timestamps = params.get("includeTimestamps", True)
+        include_speakers = params.get("includeSpeakers", True)
 
         if not meeting_id:
             raise TypeError("Missing required param: meeting_id")
-        if not fmt:
-            raise TypeError("Missing required param: format")
-        if not path:
-            raise TypeError("Missing required param: path")
 
         meeting = await self._db.get_meeting(meeting_id)
         if meeting is None:
@@ -1026,7 +1025,30 @@ class JsonRpcHandler:
 
         segments = await self._db.get_segments(meeting_id)
         exporter = TranscriptExporter(segments=segments, meeting=meeting)
-        exporter.save(Path(path), format=fmt)
+
+        # Generate content based on format
+        content_generators = {
+            "txt": lambda: exporter.to_txt(include_timestamps=include_timestamps, include_speakers=include_speakers),
+            "md": lambda: exporter.to_markdown(include_timestamps=include_timestamps),
+            "srt": lambda: exporter.to_srt(),
+            "json": lambda: exporter.to_json(),
+        }
+        gen = content_generators.get(fmt)
+        if gen is None:
+            raise ValueError(f"Unknown format '{fmt}'. Supported: {', '.join(content_generators)}")
+
+        content = gen()
+
+        # Preview mode: return content without saving
+        if is_preview:
+            return {"content": content, "format": fmt}
+
+        # Save mode: need path
+        if not path:
+            raise TypeError("Missing required param: path")
+
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(content, encoding="utf-8")
 
         logger.info("Exported meeting %s to %s (format=%s)", meeting_id, path, fmt)
         return {"path": path, "format": fmt}

@@ -1,6 +1,6 @@
 {
   "name": "voicescribe",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -44,7 +44,7 @@
       }
     ],
     "directories": {
-      "output": "../release/0.0.4"
+      "output": "../release/0.0.5"
     }
   },
   "dependencies": {

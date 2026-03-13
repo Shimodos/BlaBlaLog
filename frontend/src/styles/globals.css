@@ -527,11 +527,13 @@ tr.clickable {
 
 .transcript-line {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   line-height: 1.6;
+  position: relative;
 }
 
 .transcript-line:hover {
@@ -1020,4 +1022,94 @@ tr.clickable {
 @keyframes progress-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+/* Processing spinner (rotating circle) */
+.processing-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--text-muted);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Animated stripe on progress bar when active */
+.processing-progress__fill--pulse {
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent-hover) 50%,
+    var(--accent) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== Copy Button ===== */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.transcript-line:hover .copy-btn,
+.copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.copy-btn--normal {
+  opacity: 1;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.copy-btn--normal:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+/* ===== Transcript Container with Toolbar ===== */
+.transcript-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.transcript-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
 }

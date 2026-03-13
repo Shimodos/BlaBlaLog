@@ -4,7 +4,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
   delete process.env.ELECTRON_RUN_AS_NODE;
 }
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -238,6 +238,17 @@ app.whenReady().then(() => {
 
   ipcMain.on("window:close", () => {
     if (mainWindow) mainWindow.close();
+  });
+
+  // Save file dialog
+  ipcMain.handle("dialog:save", async (_event, { defaultName, filters }) => {
+    if (!mainWindow) return null;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName || "transcript",
+      filters: filters || [{ name: "All Files", extensions: ["*"] }],
+    });
+    if (result.canceled) return null;
+    return result.filePath;
   });
 
   startPythonBackend();
