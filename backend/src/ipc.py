@@ -763,10 +763,11 @@ class JsonRpcHandler:
             is_multilingual = self._settings.language == "auto"
 
             # Pick transcription method: multilingual (per-chunk auto-detect) or fixed language
+            # vad_filter=False because we already run Silero VAD externally (no double processing)
             def _transcribe(audio_data: np.ndarray) -> list[dict]:
                 if is_multilingual:
-                    return engine.transcribe_multilingual(audio_data, beam_size=1, vad_filter=True)
-                return engine.transcribe(audio_data, None, 1, True)
+                    return engine.transcribe_multilingual(audio_data, beam_size=1, vad_filter=False)
+                return engine.transcribe(audio_data, None, 1, False)
 
             if dual_mode:
                 # ===== DUAL-SOURCE MODE =====

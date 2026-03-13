@@ -26,9 +26,9 @@ USER_DATA_DIR = _get_user_data_dir()
 
 
 class Settings(BaseSettings):
-    whisper_model: str = "small"
+    whisper_model: str = "base"  # base=fast on CPU, small=better quality, tiny=instant
     whisper_device: str = "auto"
-    language: str = "ru"
+    language: str = "auto"
     sample_rate: int = 16000
     vad_threshold: float = 0.5
     min_speech_duration: float = 0.5

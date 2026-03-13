@@ -14,12 +14,13 @@ jobs:
           - os: windows-latest
             platform: win
             requirements: requirements-win.txt
-          - os: macos-latest
-            platform: mac
-            requirements: requirements-mac.txt
-          - os: ubuntu-latest
-            platform: linux
-            requirements: requirements-linux.txt
+          # macOS and Linux disabled until Windows build is stable
+          # - os: macos-latest
+          #   platform: mac
+          #   requirements: requirements-mac.txt
+          # - os: ubuntu-latest
+          #   platform: linux
+          #   requirements: requirements-linux.txt
 
     runs-on: ${{ matrix.os }}
 

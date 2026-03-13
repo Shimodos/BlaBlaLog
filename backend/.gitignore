@@ -1,5 +1,6 @@
-# Virtual environment
+# Virtual environments
 .venv/
+.venv-*/
 venv/
 
 # Python cache
@@ -14,9 +15,7 @@ dist/
 *.spec
 
 # Runtime data
-data/*.db
-data/*.wav
-data/*.mp3
+data/
 
 # Models (downloaded at runtime)
 models/

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import logging
+import os
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -72,10 +73,17 @@ class TranscriptionEngine:
 
         from faster_whisper import WhisperModel
 
+        # Use physical CPU core count for optimal threading
+        cpu_threads = os.cpu_count() or 4
+        # CTranslate2 works best with physical cores (not hyperthreaded)
+        cpu_threads = max(1, cpu_threads // 2)
+
         self._model: WhisperModel = WhisperModel(
             model_size,
             device=resolved_device,
             compute_type=compute_type,
+            cpu_threads=cpu_threads,
+            num_workers=2,  # parallel segment processing
         )
 
     # ------------------------------------------------------------------
@@ -138,6 +146,9 @@ class TranscriptionEngine:
             language=lang,
             beam_size=beam_size,
             vad_filter=vad_filter,
+            condition_on_previous_text=False,  # faster, prevents hallucination loops
+            without_timestamps=True,           # skip timestamp tokens (~10% faster)
+            no_speech_threshold=0.6,           # skip silence faster
         )
 
         results: list[dict] = []
@@ -206,6 +217,9 @@ class TranscriptionEngine:
             language=None,  # auto-detect per chunk
             beam_size=beam_size,
             vad_filter=vad_filter,
+            condition_on_previous_text=False,
+            without_timestamps=True,
+            no_speech_threshold=0.6,
         )
 
         lang = info.language
