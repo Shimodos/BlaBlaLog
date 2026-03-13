@@ -44,9 +44,13 @@ jobs:
           Expand-Archive python-embed.zip -DestinationPath .venv/Scripts -Force
           Remove-Item python-embed.zip
 
-          # Enable site-packages by uncommenting 'import site' in ._pth file
+          # Enable site-packages and add backend root to path in ._pth file
           $pthFile = Get-ChildItem .venv/Scripts/python*._pth | Select-Object -First 1
-          (Get-Content $pthFile) -replace '#import site','import site' | Set-Content $pthFile
+          $content = (Get-Content $pthFile) -replace '#import site','import site'
+          # Add parent dirs so 'from src.main import main' works
+          # When python.exe is in .venv/Scripts/, "../.." points to backend/
+          $content = @("../..") + $content
+          Set-Content $pthFile $content
 
           # Install pip into embedded Python
           Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
@@ -56,8 +60,8 @@ jobs:
           # Install project dependencies
           .venv/Scripts/python.exe -m pip install -r requirements-win.txt --no-warn-script-location
 
-          # Verify backend can import
-          .venv/Scripts/python.exe -c "from src.main import main; print('Backend imports OK')"
+          # Verify backend can import (._pth adds ../.. so cwd must be backend/)
+          .venv/Scripts/python.exe -c "import sys; print('sys.path:', sys.path); from src.main import main; print('Backend imports OK')"
 
       - name: Create portable backend (macOS/Linux)
         if: runner.os != 'Windows'
