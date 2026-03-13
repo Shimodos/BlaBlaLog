@@ -41,49 +41,49 @@ jobs:
           $pyVersion = "3.11.9"
           $zipUrl = "https://www.python.org/ftp/python/$pyVersion/python-$pyVersion-embed-amd64.zip"
           Invoke-WebRequest -Uri $zipUrl -OutFile python-embed.zip
-          New-Item -ItemType Directory -Force -Path .venv/Scripts
-          Expand-Archive python-embed.zip -DestinationPath .venv/Scripts -Force
+          New-Item -ItemType Directory -Force -Path .venv-portable/Scripts
+          Expand-Archive python-embed.zip -DestinationPath .venv-portable/Scripts -Force
           Remove-Item python-embed.zip
 
           # Enable site-packages in ._pth file (needed for pip install)
-          $pthFile = Get-ChildItem .venv/Scripts/python*._pth | Select-Object -First 1
+          $pthFile = Get-ChildItem .venv-portable/Scripts/python*._pth | Select-Object -First 1
           @("python311.zip", ".", "Lib\site-packages", "import site") | Set-Content $pthFile
 
           # Install pip into embedded Python
           Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
-          .venv/Scripts/python.exe get-pip.py --no-warn-script-location
+          .venv-portable/Scripts/python.exe get-pip.py --no-warn-script-location
           Remove-Item get-pip.py
 
           # Install project dependencies
-          .venv/Scripts/python.exe -m pip install -r requirements-win.txt --no-warn-script-location
+          .venv-portable/Scripts/python.exe -m pip install -r requirements-win.txt --no-warn-script-location
 
           # Remove ._pth file so PYTHONPATH works at runtime
           # (._pth overrides sys.path completely, blocking PYTHONPATH)
           Remove-Item $pthFile
 
           # Verify backend can import
-          $sitePkgs = Join-Path (Get-Location).Path ".venv\Scripts\Lib\site-packages"
+          $sitePkgs = Join-Path (Get-Location).Path ".venv-portable\Scripts\Lib\site-packages"
           $env:PYTHONPATH = "$(Get-Location);$sitePkgs"
-          .venv/Scripts/python.exe -c "from src.main import main; print('Backend imports OK')"
+          .venv-portable/Scripts/python.exe -c "from src.main import main; print('Backend imports OK')"
 
       - name: Create portable backend (macOS/Linux)
         if: runner.os != 'Windows'
         working-directory: backend
         run: |
           # Create venv with copies (embeds python binary, not symlinks)
-          python -m venv --copies .venv
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install -r ${{ matrix.requirements }}
+          python -m venv --copies .venv-portable
+          .venv-portable/bin/python -m pip install --upgrade pip
+          .venv-portable/bin/python -m pip install -r ${{ matrix.requirements }}
 
           # Make shebangs portable
-          find .venv/bin -maxdepth 1 -type f | while read f; do
+          find .venv-portable/bin -maxdepth 1 -type f | while read f; do
             if head -1 "$f" | grep -q "^#!.*python"; then
               sed -i.bak "1s|#!.*|#!/usr/bin/env python3|" "$f" && rm -f "$f.bak"
             fi
           done
 
           # Verify
-          .venv/bin/python -c "from src.main import main; print('Backend imports OK')"
+          .venv-portable/bin/python -c "from src.main import main; print('Backend imports OK')"
 
       # ---- Node.js frontend ----
       - uses: actions/setup-node@v4
@@ -104,16 +104,45 @@ jobs:
         working-directory: frontend
         run: npx electron-builder --${{ matrix.platform }} --publish never
 
+      # Zip the unpacked build for release download
+      - name: Package build for release (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content frontend/package.json | ConvertFrom-Json).version
+          $src = "release/$version/win-unpacked"
+          $dst = "release/VoiceScribe-v$version-win-x64.zip"
+          if (Test-Path $src) {
+            Compress-Archive -Path $src -DestinationPath $dst -Force
+            Write-Host "Created $dst"
+          }
+
+      - name: Package build for release (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: |
+          VERSION=$(node -p "require('./frontend/package.json').version")
+          if [ -d "release/$VERSION" ]; then
+            cd "release/$VERSION"
+            for f in *.dmg *.AppImage; do
+              [ -f "$f" ] && echo "Found $f"
+            done
+            # Zip unpacked dirs if any
+            for d in */; do
+              if [ -d "$d" ]; then
+                zip -r "../VoiceScribe-v$VERSION-${d%/}.zip" "$d"
+              fi
+            done
+          fi
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: voicescribe-${{ matrix.platform }}
           path: |
+            release/*.zip
             release/**/*.exe
             release/**/*.dmg
             release/**/*.AppImage
-            release/**/*.zip
-            release/**/win-unpacked/**
           if-no-files-found: warn
 
   release:
