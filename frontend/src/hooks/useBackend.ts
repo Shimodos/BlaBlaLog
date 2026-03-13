@@ -122,7 +122,16 @@ export function useBackend() {
       if (hasElectron) {
         try {
           const status: any = await window.electronAPI!.getBackendStatus();
-          if (!cancelled) setIsConnected(status?.running ?? false);
+          if (!cancelled) {
+            const running = status?.running ?? false;
+            setIsConnected(running);
+            // Once connected, slow down polling
+            if (running && pollMs !== 5000) {
+              pollMs = 5000;
+              clearInterval(interval);
+              interval = setInterval(checkConnection, pollMs);
+            }
+          }
         } catch {
           if (!cancelled) setIsConnected(false);
         }
@@ -133,7 +142,9 @@ export function useBackend() {
     }
 
     checkConnection();
-    const interval = setInterval(checkConnection, 5000);
+    // Poll every 1s until connected, then slow to 5s
+    let pollMs = 1000;
+    let interval = setInterval(checkConnection, pollMs);
 
     if (hasElectron) {
       window.electronAPI!.onBackendEvent((data: any) => {

@@ -7,7 +7,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 
 let mainWindow = null;
 let pythonProcess = null;
@@ -16,6 +16,37 @@ let pythonProcess = null;
 const pendingRequests = new Map();
 let requestId = 0;
 let stdoutBuffer = "";
+
+// On macOS/Linux, ensure venv python binaries have execute permission
+// (electron-builder can strip +x when copying extraResources)
+function ensureVenvExecutable(venvDir) {
+  if (process.platform === "win32") return;
+  const binDir = path.join(venvDir, "bin");
+  if (!fs.existsSync(binDir)) return;
+  try {
+    execSync(`chmod +x "${binDir}"/python* 2>/dev/null || true`, { stdio: "ignore" });
+  } catch { /* ignore */ }
+}
+
+// Auto-detect site-packages path inside a venv (handles different Python versions)
+function findSitePackages(venvDir) {
+  const isWin = process.platform === "win32";
+  if (isWin) {
+    return path.join(venvDir, "Scripts", "Lib", "site-packages");
+  }
+  // macOS/Linux: .venv/lib/python3.XX/site-packages — find the actual version
+  const libDir = path.join(venvDir, "lib");
+  if (fs.existsSync(libDir)) {
+    try {
+      const entries = fs.readdirSync(libDir).filter((e) => e.startsWith("python"));
+      if (entries.length > 0) {
+        return path.join(libDir, entries[0], "site-packages");
+      }
+    } catch { /* ignore */ }
+  }
+  // Fallback to python3.11
+  return path.join(libDir, "python3.11", "site-packages");
+}
 
 function getPythonPath() {
   const isWin = process.platform === "win32";
@@ -31,26 +62,32 @@ function getPythonPath() {
       cwd: resBackend,
     });
     // Fallback: venv inside resources/backend/
-    const venvPython = isWin
-      ? path.join(resBackend, ".venv", "Scripts", "python.exe")
-      : path.join(resBackend, ".venv", "bin", "python");
-    candidates.push({
-      exe: venvPython,
-      args: ["-m", "src.main", "serve"],
-      cwd: resBackend,
-    });
+    const venvDir = path.join(resBackend, ".venv");
+    ensureVenvExecutable(venvDir);
+    // Try multiple python binary names (macOS venv may have python3 but not python)
+    const pythonNames = isWin ? ["python.exe"] : ["python", "python3", "python3.11"];
+    const binDir = isWin ? path.join(venvDir, "Scripts") : path.join(venvDir, "bin");
+    for (const name of pythonNames) {
+      candidates.push({
+        exe: path.join(binDir, name),
+        args: ["-m", "src.main", "serve"],
+        cwd: resBackend,
+      });
+    }
   }
 
   // Dev / portable: backend is sibling folder
   const devBackend = path.resolve(__dirname, "..", "..", "backend");
-  const devPython = isWin
-    ? path.join(devBackend, ".venv", "Scripts", "python.exe")
-    : path.join(devBackend, ".venv", "bin", "python");
-  candidates.push({
-    exe: devPython,
-    args: ["-m", "src.main", "serve"],
-    cwd: devBackend,
-  });
+  const devVenv = path.join(devBackend, ".venv");
+  const devPythonNames = isWin ? ["python.exe"] : ["python", "python3", "python3.11"];
+  const devBinDir = isWin ? path.join(devVenv, "Scripts") : path.join(devVenv, "bin");
+  for (const name of devPythonNames) {
+    candidates.push({
+      exe: path.join(devBinDir, name),
+      args: ["-m", "src.main", "serve"],
+      cwd: devBackend,
+    });
+  }
 
   for (const c of candidates) {
     if (fs.existsSync(c.exe)) {
@@ -87,17 +124,27 @@ function startPythonBackend() {
   log(`[BOOT] Starting Python: ${exe} ${args.join(" ")} in ${cwd}`);
   log(`[BOOT] exe exists: ${fs.existsSync(exe)}`);
 
+  // Notify renderer about init progress
+  function sendInitStatus(stage, message) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("backend:init-status", { stage, message });
+    }
+  }
+
   try {
+    sendInitStatus("starting", "Starting backend process...");
+
     // Set PYTHONPATH so embedded Python finds 'src' module + installed packages
     const isWin = process.platform === "win32";
     const sep = isWin ? ";" : ":";
-    const sitePackages = isWin
-      ? path.join(cwd, ".venv", "Scripts", "Lib", "site-packages")
-      : path.join(cwd, ".venv", "lib", "python3.11", "site-packages");
+    const venvDir = path.join(cwd, ".venv");
+    const sitePackages = findSitePackages(venvDir);
     const pythonPath = [cwd, sitePackages].join(sep);
     const env = { ...process.env, PYTHONPATH: pythonPath };
     log(`[BOOT] PYTHONPATH=${pythonPath}`);
     pythonProcess = spawn(exe, args, { cwd, stdio: ["pipe", "pipe", "pipe"], env });
+
+    sendInitStatus("loading", "Loading Python environment...");
 
     pythonProcess.stdout.setEncoding("utf8");
     pythonProcess.stdout.on("data", (data) => {
@@ -141,6 +188,15 @@ function startPythonBackend() {
         for (const line of text.split("\n")) {
           if (line.trim()) {
             mainWindow.webContents.send("backend:log", line.trim());
+            // Detect init phases from stderr and forward as init-status
+            const lower = line.toLowerCase();
+            if (lower.includes("loading model") || lower.includes("downloading")) {
+              sendInitStatus("models", line.trim());
+            } else if (lower.includes("server") && lower.includes("start")) {
+              sendInitStatus("ready", line.trim());
+            } else if (lower.includes("import") || lower.includes("initializ")) {
+              sendInitStatus("loading", line.trim());
+            }
           }
         }
       }
@@ -273,8 +329,8 @@ app.whenReady().then(() => {
     return result.filePath;
   });
 
-  startPythonBackend();
   createWindow();
+  startPythonBackend();
 });
 
 app.on("before-quit", () => {

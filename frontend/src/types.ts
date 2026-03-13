@@ -52,6 +52,7 @@ export interface ElectronAPI {
   getBackendStatus(): Promise<boolean>;
   onBackendEvent(callback: (data: any) => void): void;
   onBackendLog(callback: (line: string) => void): void;
+  onBackendInitStatus(callback: (status: { stage: string; message: string }) => void): void;
   minimize(): void;
   maximize(): void;
   close(): void;

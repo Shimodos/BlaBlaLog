@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("backend:event", (_event, data) => callback(data)),
   onBackendLog: (callback) =>
     ipcRenderer.on("backend:log", (_event, line) => callback(line)),
+  onBackendInitStatus: (callback) =>
+    ipcRenderer.on("backend:init-status", (_event, status) => callback(status)),
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),

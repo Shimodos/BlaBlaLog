@@ -6,6 +6,7 @@ import { MeetingDetail } from '@/components/MeetingDetail';
 import { SpeakerList } from '@/components/SpeakerList';
 import { Settings } from '@/components/Settings';
 import { LogViewer } from '@/components/LogViewer';
+import { BackendInitModal } from '@/components/BackendInitModal';
 import type { PageName } from '@/types';
 
 const NAV_ITEMS: { page: PageName; icon: string; label: string }[] = [
@@ -63,6 +64,7 @@ export function App() {
 
   return (
     <div className="app-layout">
+      <BackendInitModal />
       {/* Custom title bar — draggable, spans full width */}
       <div className="custom-titlebar">
         <span className="custom-titlebar__label">VoiceScribe</span>
