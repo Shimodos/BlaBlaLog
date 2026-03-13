@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,34 +14,37 @@ jobs:
           - os: windows-latest
             platform: win
             requirements: requirements-win.txt
+            python_venv: .venv\Scripts\python.exe
           - os: macos-latest
             platform: mac
             requirements: requirements-mac.txt
+            python_venv: .venv/bin/python
           - os: ubuntu-latest
             platform: linux
             requirements: requirements-linux.txt
+            python_venv: .venv/bin/python
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # ---- Python backend ----
+      # ---- Python backend (install into venv) ----
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install Python dependencies
+      - name: Create backend venv and install deps
         working-directory: backend
         run: |
-          pip install --upgrade pip
-          pip install -r ${{ matrix.requirements }}
-          pip install pyinstaller
+          python -m venv .venv
+          ${{ matrix.python_venv }} -m pip install --upgrade pip
+          ${{ matrix.python_venv }} -m pip install -r ${{ matrix.requirements }}
 
-      - name: Build backend with PyInstaller
+      - name: Verify backend starts
         working-directory: backend
-        run: pyinstaller voicescribe.spec
+        run: |
+          ${{ matrix.python_venv }} -c "from src.main import main; print('Backend imports OK')"
 
       # ---- Node.js frontend ----
       - uses: actions/setup-node@v4
@@ -71,6 +74,9 @@ jobs:
             release/**/*.dmg
             release/**/*.AppImage
             release/**/*.zip
+            release/**/win-unpacked/**
+            release/**/mac-unpacked/**
+            release/**/linux-unpacked/**
           if-no-files-found: warn
 
   release:

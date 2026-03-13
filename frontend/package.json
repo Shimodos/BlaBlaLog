@@ -28,8 +28,18 @@
     ],
     "extraResources": [
       {
-        "from": "../backend/dist/voicescribe-backend",
-        "to": "backend"
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "src/**/*",
+          "requirements*.txt",
+          ".venv/**/*",
+          "!.venv/**/pip*",
+          "!.venv/**/setuptools*",
+          "!.venv/**/wheel*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       }
     ],
     "win": {
