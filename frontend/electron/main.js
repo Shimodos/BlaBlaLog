@@ -88,7 +88,9 @@ function startPythonBackend() {
   log(`[BOOT] exe exists: ${fs.existsSync(exe)}`);
 
   try {
-    pythonProcess = spawn(exe, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+    // Set PYTHONPATH to backend root so embedded Python can find 'src' module
+    const env = { ...process.env, PYTHONPATH: cwd };
+    pythonProcess = spawn(exe, args, { cwd, stdio: ["pipe", "pipe", "pipe"], env });
 
     pythonProcess.stdout.setEncoding("utf8");
     pythonProcess.stdout.on("data", (data) => {
