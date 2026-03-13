@@ -18,29 +18,39 @@ let requestId = 0;
 let stdoutBuffer = "";
 
 function getPythonPath() {
-  // Check multiple locations for the Python backend
+  const isWin = process.platform === "win32";
+  const ext = isWin ? ".exe" : "";
   const candidates = [];
 
   if (app.isPackaged) {
-    // electron-builder: resources/backend
+    // PyInstaller frozen backend inside resources/backend/
     const resBackend = path.join(process.resourcesPath, "backend");
-    candidates.push(
-      { exe: path.join(resBackend, "voicescribe-backend.exe"), args: ["serve"], cwd: resBackend },
-      { exe: path.join(resBackend, ".venv", "Scripts", "python.exe"), args: ["-m", "src.main", "serve"], cwd: resBackend },
-    );
+    candidates.push({
+      exe: path.join(resBackend, `voicescribe-backend${ext}`),
+      args: ["serve"],
+      cwd: resBackend,
+    });
+    // Fallback: venv inside resources/backend/
+    const venvPython = isWin
+      ? path.join(resBackend, ".venv", "Scripts", "python.exe")
+      : path.join(resBackend, ".venv", "bin", "python");
+    candidates.push({
+      exe: venvPython,
+      args: ["-m", "src.main", "serve"],
+      cwd: resBackend,
+    });
   }
 
-  // Portable build: backend is sibling to app folder (electron/.. -> app/.. -> VoiceScribe/)
-  const portableBackend = path.resolve(__dirname, "..", "..", "backend");
-  candidates.push(
-    { exe: path.join(portableBackend, ".venv", "Scripts", "python.exe"), args: ["-m", "src.main", "serve"], cwd: portableBackend },
-  );
-
-  // Dev: backend in project root
+  // Dev / portable: backend is sibling folder
   const devBackend = path.resolve(__dirname, "..", "..", "backend");
-  candidates.push(
-    { exe: path.join(devBackend, ".venv", "Scripts", "python.exe"), args: ["-m", "src.main", "serve"], cwd: devBackend },
-  );
+  const devPython = isWin
+    ? path.join(devBackend, ".venv", "Scripts", "python.exe")
+    : path.join(devBackend, ".venv", "bin", "python");
+  candidates.push({
+    exe: devPython,
+    args: ["-m", "src.main", "serve"],
+    cwd: devBackend,
+  });
 
   for (const c of candidates) {
     if (fs.existsSync(c.exe)) {
@@ -48,11 +58,14 @@ function getPythonPath() {
     }
   }
 
-  // Last resort
-  if (process.platform === "win32") {
-    return { exe: "py", args: ["-3.11", "-m", "src.main", "serve"], cwd: portableBackend };
+  // Last resort: system python
+  const fallbackCwd = app.isPackaged
+    ? path.join(process.resourcesPath, "backend")
+    : devBackend;
+  if (isWin) {
+    return { exe: "py", args: ["-3.11", "-m", "src.main", "serve"], cwd: fallbackCwd };
   }
-  return { exe: "python3", args: ["-m", "src.main", "serve"], cwd: portableBackend };
+  return { exe: "python3", args: ["-m", "src.main", "serve"], cwd: fallbackCwd };
 }
 
 function startPythonBackend() {

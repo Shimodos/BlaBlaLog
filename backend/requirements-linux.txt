@@ -1,0 +1,5 @@
+# Linux-specific
+-r requirements-base.txt
+torch>=2.1 --index-url https://download.pytorch.org/whl/cpu
+torchaudio>=2.1 --index-url https://download.pytorch.org/whl/cpu
+speechbrain>=1.0

@@ -1,6 +1,6 @@
 {
   "name": "voicescribe",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -18,33 +18,42 @@
     "appId": "com.voicescribe.app",
     "productName": "VoiceScribe",
     "asar": false,
-    "win": {
-      "target": [
-        {
-          "target": "dir",
-          "arch": ["x64"]
-        }
-      ],
-      "signAndEditExecutable": false
-    },
     "files": [
       "dist/**/*",
       "electron/**/*"
     ],
     "extraResources": [
       {
-        "from": "../backend",
-        "to": "backend",
-        "filter": [
-          "src/**/*",
-          "requirements.txt",
-          "data/**/*",
-          ".venv/**/*"
-        ]
+        "from": "../backend/dist/voicescribe-backend",
+        "to": "backend"
       }
     ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "category": "AudioVideo"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "directories": {
-      "output": "../release/0.0.5"
+      "output": "../release/${version}"
     }
   },
   "dependencies": {

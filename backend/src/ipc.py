@@ -23,7 +23,8 @@ from src.utils.config import get_settings
 from src.utils.logger import get_logger
 
 # Lazy imports for heavy modules (torch-dependent)
-AudioCapture = None
+get_loopback_capture = None
+list_loopback_devices_fn = None
 MicrophoneCapture = None
 VoiceActivityDetector = None
 SpeakerDiarizer = None
@@ -35,10 +36,11 @@ StreamingTranscriber = None
 
 
 def _lazy_import_audio():
-    global AudioCapture, MicrophoneCapture
-    if AudioCapture is None:
-        from src.audio.capture import AudioCapture as _AC
-        AudioCapture = _AC
+    global get_loopback_capture, list_loopback_devices_fn, MicrophoneCapture
+    if get_loopback_capture is None:
+        from src.audio.loopback import get_loopback_capture as _glc, list_loopback_devices as _lld
+        get_loopback_capture = _glc
+        list_loopback_devices_fn = _lld
     try:
         if MicrophoneCapture is None:
             from src.audio.microphone import MicrophoneCapture as _MC
@@ -97,7 +99,7 @@ class JsonRpcHandler:
     def __init__(self) -> None:
         self._settings = get_settings()
         self._db = Database(self._settings.db_path)
-        self._capture: Optional[AudioCapture] = None
+        self._capture = None  # LoopbackCapture instance
         self._mic_capture: Optional[MicrophoneCapture] = None
         self._recording_start: Optional[float] = None
         self._current_meeting_id: Optional[str] = None
@@ -463,10 +465,10 @@ class JsonRpcHandler:
         return "pong"
 
     async def _handle_get_devices(self, params: dict) -> list[dict]:
-        return await asyncio.to_thread(AudioCapture.list_devices)
+        return await asyncio.to_thread(list_loopback_devices_fn)
 
     async def _handle_get_loopback_devices(self, params: dict) -> list[dict]:
-        return await asyncio.to_thread(AudioCapture.list_loopback_devices)
+        return await asyncio.to_thread(list_loopback_devices_fn)
 
     async def _handle_get_input_devices(self, params: dict) -> list[dict]:
         """List available microphone input devices."""
@@ -474,7 +476,7 @@ class JsonRpcHandler:
 
     async def _handle_get_output_devices(self, params: dict) -> list[dict]:
         """List available system/loopback output devices."""
-        return await asyncio.to_thread(AudioCapture.list_loopback_devices)
+        return await asyncio.to_thread(list_loopback_devices_fn)
 
     async def _handle_start_recording(self, params: dict) -> dict:
         """Start recording audio (mic + loopback). Transcription happens on stop.
@@ -501,11 +503,8 @@ class JsonRpcHandler:
         await self._db.create_meeting(meeting)
         self._current_meeting_id = meeting_id
 
-        # Start loopback capture (system audio)
-        if loopback_index is not None:
-            self._capture = AudioCapture(device_index=loopback_index)
-        else:
-            self._capture = AudioCapture()  # auto-detect default loopback
+        # Start loopback capture (system audio) — platform-aware
+        self._capture = get_loopback_capture(device_index=loopback_index)
         await asyncio.to_thread(self._capture.start)
 
         # Start microphone capture (if available and requested)
