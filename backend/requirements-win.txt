@@ -1,6 +1,6 @@
 # Windows-specific
 -r requirements-base.txt
-PyAudioWPatch>=0.2.13
+PyAudioWPatch>=0.2.12
 torch>=2.1 --index-url https://download.pytorch.org/whl/cpu
 torchaudio>=2.1 --index-url https://download.pytorch.org/whl/cpu
 speechbrain>=1.0
